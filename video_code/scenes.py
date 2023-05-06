@@ -40,7 +40,7 @@ class MinimumForParabola(Scene):
         x0, x1 = x - a / 2, x + a / 2
         y0, y1 = tangent_func(x0), tangent_func(x1)
         x2, y2 = [(x1, y0), (x0, y1)][x < 0]
-        
+    
         return Polygon(
             axes.c2p(x0, y0),
             axes.c2p(x1, y1),
@@ -76,8 +76,10 @@ class MinimumForParabola(Scene):
         tangent_func = lambda x: derivative(point[0]) * (x - point[0]) + point[1]
         dot = always_redraw(lambda: Dot().move_to(axes.c2p(x_tracked.get_value(), func(x_tracked.get_value()))))
         triangle = always_redraw(lambda: self.draw_triangle(x_tracked.get_value(), a_tracked.get_value(), axes))
+        alpha_label = always_redraw(lambda: MathTex(f"Alpha = {a_tracked.get_value():.2f}").to_edge(DOWN).to_edge(RIGHT))
         self.add(dot)
         self.add(triangle)
+        self.add(alpha_label)
             
         # adjust slope
         self.play(x_tracked.animate.set_value(point[0]))
@@ -132,6 +134,8 @@ class MinimumForParabola(Scene):
             # clear 
             self.remove(dy_line)
             self.remove(to_func)
+        
+        self.remove(alpha_label)
 
 class MinimumForQuartic(Scene):
     """
