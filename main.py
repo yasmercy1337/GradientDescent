@@ -5,7 +5,7 @@ import random
 
 def create_dataset(n: int) -> tuple[np.ndarray, np.ndarray]:
     """ Creates the inputs and expected outputs"""
-    data = list(range(n * 3))
+    data = list(range(n * 2))
     chosen = random.sample(data, n)
 
     inputs = np.array([np.array([x]) for x in chosen])
@@ -19,9 +19,9 @@ def train_test_split(arr: np.ndarray, n: float = 0.5) -> tuple[np.ndarray, np.nd
     return arr[:cutoff], arr[cutoff:]
 
 def main():
-    net = Network(1, 1, 3, 3)
+    net = Network(1, 1, 2, 2)
     # print(net)
-    inputs, outputs = create_dataset(10)
+    inputs, outputs = create_dataset(1000)
     train_in, train_out = train_test_split(inputs)
     test_in, test_out = train_test_split(inputs)
 
@@ -33,10 +33,10 @@ def main():
     #     print(out, real, cost(out, real))
         # print(net, "\n")
 
-    net.train(train_in, train_out, iterations=10000)
-    # print(net)
+    net.train(train_in, train_out, iterations=500)
+    print(net)
     print(net.evaluate(np.array([5])))
-    print(net.evaluate(np.array([10])))
+    print(net.evaluate(np.array([4])))
 
 if __name__ == "__main__":
     main()

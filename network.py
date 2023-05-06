@@ -78,7 +78,7 @@ class Network:
             layer.biases -= b * learning_rate
 
     def train(self, inputs: list[np.ndarray], real_outputs: list[np.ndarray], 
-              iterations: int = 10, learning_rate: float = 0.000001) -> None:
+              iterations: int = 10, learning_rate: float = 0.0000001) -> None:
         """ Takes in labeled dataset and trains for n iterations"""
         for _ in range(iterations):
             dW, dB = self.zero_gradient()
