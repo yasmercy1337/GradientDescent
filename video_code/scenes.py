@@ -34,27 +34,20 @@ Point:
 """
 
 class MinimumForParabola(Scene):
-    """
-    Gradient descent method on parabola (C=x^2)
-
-    1) x = 5, alpha = 0.1
-        x0 = 5,     dC/dx = 10
-        x1 = 4,     dC/dX = 8
-        x2 = 3.2    dC/dX = 6.4
-        ...
     
-    2) x = 5, alpha = 1
-        x0 = 5      dC/dX = 10
-        ...
-
-    3) x = 5, alpha = 3
-        x0 = 5
-        x1 = -25
-        x2 = 125
-        ...
-
-    """
-    
+    def draw_triangle(self, x: float, a: float, axes: Axes) -> Polygon:
+        tangent_func = lambda x_in: 2 * x * (x_in - x) + x ** 2 
+        x0, x1 = x - a / 2, x + a / 2
+        y0, y1 = tangent_func(x0), tangent_func(x1)
+        x2, y2 = [(x1, y0), (x0, y1)][x < 0]
+        
+        return Polygon(
+            axes.c2p(x0, y0),
+            axes.c2p(x1, y1),
+            axes.c2p(x2, y2)
+        )
+        
+        
     def construct(self):
         x0 = np.array([1.])
         func = lambda x: x ** 2
@@ -75,31 +68,38 @@ class MinimumForParabola(Scene):
         self.add(plot, labels)
 
         point = points.pop(0)
-        display_point = Dot(axes.coords_to_point(*point))
-        self.add(display_point)
 
+        # trackers
+        a_tracked = ValueTracker(alpha)
+        x_tracked = ValueTracker(point[0])
         # tangent triangle
-        # tangent_func = lambda x: derivative(point[0]) * (x - point[0]) + point[1]
-        # x0, x1 = point[0] - alpha / 2, point[0] + alpha / 2
-        # y0, y1 = tangent_func(x0), tangent_func(x1)
-        # corner = [(x1, y0), (x0, y1)][derivative(point[0]) * derivative_2(point[1]) < 0] # x1 if derivatives are opp signs
-        # triangle = Polygon(axes.c2p(x0, y0), axes.c2p(x1, y1), axes.c2p(*corner))
-        # self.add(triangle)
-        # self.play(GrowFromPoint(triangle, axes.c2p(*point)))
-
+        tangent_func = lambda x: derivative(point[0]) * (x - point[0]) + point[1]
+        dot = always_redraw(lambda: Dot().move_to(axes.c2p(x_tracked.get_value(), func(x_tracked.get_value()))))
+        triangle = always_redraw(lambda: self.draw_triangle(x_tracked.get_value(), a_tracked.get_value(), axes))
+        self.add(dot)
+        self.add(triangle)
+            
         # adjust slope
-
+        self.play(x_tracked.animate.set_value(point[0]))
+        self.play(x_tracked.animate.set_value(1.5), run_time=2)
+        self.play(x_tracked.animate.set_value(0.5), run_time=2)
+        self.play(x_tracked.animate.set_value(1), run_time=1)
+        
         # adjust learning rate
+        self.play(a_tracked.animate.set_value(alpha))
+        self.play(a_tracked.animate.set_value(1.3))
+        self.play(a_tracked.animate.set_value(0.3))
+        self.play(a_tracked.animate.set_value(alpha))
+        
         # clear
-
-        self.wait(1)
+        self.remove(triangle)
 
         for p in points:
             # tangent triangle
             tangent_func = lambda x: derivative(point[0]) * (x - point[0]) + point[1]
             x0, x1 = point[0] - alpha / 2, point[0] + alpha / 2
             y0, y1 = tangent_func(x0), tangent_func(x1)
-            corner = [(x1, y0), (x0, y1)][derivative(point[0]) * derivative_2(point[1]) < 0] # x1 if derivatives are opp signs
+            corner = [(x1, y0), (x0, y1)][derivative(point[0]) * derivative_2(point[0]) < 0] # x1 if derivatives are opp signs
             triangle = Polygon(axes.c2p(x0, y0), axes.c2p(x1, y1), axes.c2p(*corner))
             self.add(triangle)
             self.play(GrowFromPoint(triangle, axes.c2p(*point)))
