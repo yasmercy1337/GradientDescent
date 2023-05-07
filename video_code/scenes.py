@@ -6,19 +6,111 @@ from manim.camera.camera import Camera
 import numpy as np
 import itertools as it
 
-Input2D = float
-Input3D = np.ndarray
+Input = float
 Output = float
-Function2D = Callable[[Input2D], Output]
+Function2D = Callable[[Input], Output]
+Function3D = Callable[[Input, Input], Output]
 
 # TODO: implement fade transitions for everything
 
+class GradientWalkthrough3D(ThreeDScene, ABC):
+    def __init__(self, 
+                 x_range: tuple[float, float, float] = (-6, 6, 1), 
+                 y_range: tuple[float, float, float] = (-6, 6, 1),
+                 z_range: tuple[float, float, float] = (-6, 6, 1),
+                 func_equation: str = "f(x, y)", 
+                 x_default: Input = 1,
+                 y_default: Input = 1,
+                 alpha_default: float = 1,
+                 **kwargs
+                 ) -> None:
+        
+        super().__init__(**kwargs)
+        
+        # setting axis and graph 
+        self.ax = ThreeDAxes(
+            x_range=x_range,
+            y_range=y_range,
+            z_range=z_range,
+            axis_config={"include_numbers": True},
+            x_length=8,
+            y_length=6,
+            z_length=6
+        )
+        
+        self.surface = Surface(
+            lambda u, v: self.c2p(u, v, self.func(u, v)),
+            u_range=x_range,
+            v_range=y_range,
+            checkerboard_colors=[BLUE_E],
+            resolution=30,
+        )
+        self.surface_label = MathTex(func_equation, color=BLUE).to_edge(LEFT).to_edge(DOWN)
+        self.add(self.ax, self.surface, self.surface_label)
+        
+        # values
+        self.x = ValueTracker(x_default)
+        self.y = ValueTracker(y_default)
+        self.alpha = ValueTracker(alpha_default)
+        
+        # value labels
+        self.value_labels = always_redraw(
+            lambda: VGroup(
+                Tex(f"x = {self.x.get_value():.2f}").to_edge(RIGHT).to_edge(DOWN, buff=2),
+                Tex(f"y = {self.y.get_value():.2f}").to_edge(RIGHT).to_edge(DOWN, buff=1),
+                MathTex(rf"\alpha = {self.alpha.get_value():.2f}").to_edge(RIGHT).to_edge(DOWN)
+            )
+        )
+        self.add(self.value_labels)
+        
+        # visuals
+        self.point = always_redraw(self.create_point)
+        self.add(self.point)
+        
+        # camera
+        self.set_camera_orientation(phi=30 * DEGREES)
+        # self.begin_ambient_camera_rotation(rate=PI/15)
+        
+    def create_point(self) -> Dot:
+        x, y = self.x.get_value(), self.y.get_value()
+        return Dot(self.c2p(x, y, self.func(x, y)))
+    
+    def c2p(self, x: Input, y: Input, z: Output):
+        return self.ax.c2p(x, y, z,)
+    
+    def travel_tracker(self, value: ValueTracker, keypoints: list) -> None:
+        for point in keypoints:
+            self.play(value.animate.set_value(point))
+    
+    def create_tangent_plane(self) -> None:
+        x, y = self.x.get_value(), self.y.get_value()
+        z = self.func(x, y)
+        alpha = self.alpha.get_value()
+        def tangent_func(u, v):
+            dx, dy = -self.deriv(x, y)
+            return dx * (u - x) + dy * (v - y) + self.func(x, y)
+        
+        return Surface(
+            lambda u, v: self.c2p(u, v, tangent_func(u, v)),
+            u_range=[x - alpha / 2, x + alpha / 2],
+            v_range=[y - alpha/ 2, y + alpha / 2]
+        )
+        
+            
+    @abstractmethod
+    def func(self, x: Input, y: Input) -> Output:
+        """ The function defintion for a given 2D graph """
+    
+    @abstractmethod
+    def deriv(self, x: Input, y: Input) -> np.ndarray:
+        """ Derivative for the function """
+    
 class GradientWalkthrough2D(Scene, ABC):
     def __init__(self, 
                  x_range: tuple[float, float, float] = (-10, 10, 1), 
                  y_range: tuple[float, float, float] = (-7, 7, 1),
                  func_equation: str = "f(x)", 
-                 x_default: float = 1,
+                 x_default: Input = 1,
                  alpha_default: float = 1,
                  **kwargs
                  ) -> None:
@@ -57,7 +149,7 @@ class GradientWalkthrough2D(Scene, ABC):
         self.show_triangle = False
         self.show_triangle_label = False
         
-    def c2p(self, x: Input2D, y: Input2D):
+    def c2p(self, x: Input, y: Output):
         return self.ax.c2p(x, y)
     
     def create_point(self) -> Dot:
@@ -172,37 +264,36 @@ class GradientWalkthrough2D(Scene, ABC):
             self.play(value.animate.set_value(point))
     
     def tangent_function(self) -> Function2D:
-        def f(x: Input2D) -> Output:
+        def f(x: Input) -> Output:
             x0 = self.x.get_value()
             return self.deriv(x0) * (x - x0) + self.func(x0)
         return f
     
     @abstractmethod
-    def func(self, x: Input2D) -> Output:
+    def func(self, x: Input) -> Output:
         """ The function defintion for a given 2D graph """
     
     @abstractmethod
-    def deriv(self, x: Input2D) -> Output:
+    def deriv(self, x: Input) -> Output:
         """ Derivative for the function """
     
     @abstractmethod
-    def deriv_2(self, x: Input2D) -> Output:
-        """ 2nd derivative for the function """
-    
+    def deriv_2(self, x: Input) -> Output:
+        """ 2nd derivative for the function """  
 
 class ParabolaDemo(GradientWalkthrough2D):
     def __init__(self) -> None:
         super().__init__(x_range = (-2, 2, 0.5), y_range = (-1, 4, 0.5), func_equation = "f(x) = x^2", x_default=1, alpha_default=0.9)
         
-    def func(self, x: Input2D) -> Output:
+    def func(self, x: Input) -> Output:
         """ The function defintion for a given 2D graph """
         return x ** 2
     
-    def deriv(self, x: Input2D) -> Output:
+    def deriv(self, x: Input) -> Output:
         """ Derivative for the function """
         return 2 * x
     
-    def deriv_2(self, x: Input2D) -> Output:
+    def deriv_2(self, x: Input) -> Output:
         """ 2nd derivative for the function """
         return 2
         
@@ -219,19 +310,19 @@ class ParabolaDemo(GradientWalkthrough2D):
         self.travel_tracker(self.x, [1, 1.5, -0.5, 0.5])
         
 class QuarticDemo(GradientWalkthrough2D):
+    
     def __init__(self) -> None:
-        super().__init__(x_range = (-1.2, 2, 0.5), y_range = (-1, 4, 0.5), func_equation = "f(x) = x^4 - 2x^3 + 1.5x")
-        self.x.set_value(1.5)
+        super().__init__(x_range = (-1.2, 2, 0.5), y_range = (-1, 4, 0.5), func_equation = "f(x) = x^4 - 2x^3 + 1.5x", x_default=1.5)
         
-    def func(self, x: Input2D) -> Output:
+    def func(self, x: Input) -> Output:
         """ The function defintion for a given 2D graph """
         return x ** 4 - 2 * x ** 3 + 1.5 * x
     
-    def deriv(self, x: Input2D) -> Output:
+    def deriv(self, x: Input) -> Output:
         """ Derivative for the function """
         return 4 * x ** 3 - 6 * x ** 2 + 1.5
     
-    def deriv_2(self, x: Input2D) -> Output:
+    def deriv_2(self, x: Input) -> Output:
         """ 2nd derivative for the function """
         return 12 * x ** 2 - 12 * x
         
@@ -240,3 +331,24 @@ class QuarticDemo(GradientWalkthrough2D):
         # self.travel_tracker(self.alpha, [1, 2, 0, 1])
         self.travel_tracker(self.x, [1.5, -1, 1.5])
         self.iterate_gradient_descent()
+        
+class GaussianDemo(GradientWalkthrough3D):
+    
+    def __init__(self) -> None:
+        super().__init__(func_equation = f"f(x, y) = e^-(x^2 + y^2)", x_range=[-3, 3], y_range=[-3, 3], z_range=[-0.5, 3],
+                         x_default=0.5, y_default=-0.5)
+    
+    def func(self, x: Input, y: Input) -> Output:
+        """ The function defintion for a given 2D graph """
+        return np.e ** - (x ** 2 + y ** 2)
+    
+    def deriv(self, x: Input, y: Input) -> np.ndarray:
+        """ Derivative for the function """
+        return 2 * self.func(x, y) * np.array([x, y])
+    
+    def construct(self):
+        self.surface.set_opacity(0.1)
+        plane = always_redraw(self.create_tangent_plane)
+        self.add(plane)
+        self.travel_tracker(self.x, [0.5, -1, 1, 0.3])
+        self.travel_tracker(self.y, [1, -2])
