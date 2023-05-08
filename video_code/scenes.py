@@ -37,6 +37,7 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
             y_length=6,
             z_length=6
         )
+        self.ax_labels = self.ax.get_axis_labels()
         
         self.surface = Surface(
             lambda u, v: self.c2p(u, v, self.func(u, v)),
@@ -46,7 +47,7 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
             resolution=30,
         )
         self.surface_label = MathTex(func_equation, color=BLUE).to_edge(LEFT).to_edge(DOWN)
-        self.add(self.ax, self.surface, self.surface_label)
+        self.add(self.ax, self.ax_labels, self.surface, self.surface_label)
         
         # values
         self.x = ValueTracker(x_default)
@@ -68,8 +69,8 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         self.add(self.point)
         
         # camera
-        self.set_camera_orientation(phi=30 * DEGREES)
-        # self.begin_ambient_camera_rotation(rate=PI/15)
+        self.set_camera_orientation(phi=75 * DEGREES, theta=75 * DEGREES,)
+        # self.begin_ambient_camera_rotation(rate=PI/6)
         
     def create_point(self) -> Dot:
         x, y = self.x.get_value(), self.y.get_value()
@@ -95,7 +96,38 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
             u_range=[x - alpha / 2, x + alpha / 2],
             v_range=[y - alpha/ 2, y + alpha / 2]
         )
-        
+    
+    def get_x_partial(self, y: float):
+        # XZ plane at x
+        x_min, x_max, *_ = self.ax.x_range
+        z_min, z_max, *_ = self.ax.z_range
+        vertices = [
+            (x_min, y, z_min),
+            (x_max, y, z_min),
+            (x_max, y, z_max),
+            (x_min, y, z_max),
+        ]
+        yz_plane = Polygon(*vertices, fill_opacity=0.7, fill_color=BLUE_E, color=BLUE_E)
+        self.add(yz_plane)
+        self.play(FadeIn(yz_plane))
+
+        # create z(x) 2D graph
+        twoD = self.ax.plot_parametric_curve(
+            function=lambda x: np.array([x, y, self.func(x, y)]),
+            t_range=self.ax.x_range,
+        )
+        self.add(twoD)
+        self.play(GrowFromCenter(twoD))
+
+        # rotate camera
+        self.move_camera(phi=90 * DEGREES, theta=90 * DEGREES * (-1) ** (y < 0))
+
+        # create derivative
+        x = ValueTracker(x_min)
+        point = always_redraw(lambda: Dot(self.c2p(x.get_value(), y, self.func(x.get_value(), y))))
+        derivative = always_redraw(lambda: self.ax.get_secant_slope_group(x.get_value(), twoD))
+        self.add(point, derivative)
+        self.travel_tracker(x, [x_max, x_min / 2])
             
     @abstractmethod
     def func(self, x: Input, y: Input) -> Output:
@@ -336,7 +368,7 @@ class GaussianDemo(GradientWalkthrough3D):
     
     def __init__(self) -> None:
         super().__init__(func_equation = f"f(x, y) = e^-(x^2 + y^2)", x_range=[-3, 3], y_range=[-3, 3], z_range=[-0.5, 3],
-                         x_default=0.5, y_default=-0.5)
+                         x_default=0, y_default=1)
     
     def func(self, x: Input, y: Input) -> Output:
         """ The function defintion for a given 2D graph """
@@ -347,8 +379,14 @@ class GaussianDemo(GradientWalkthrough3D):
         return 2 * self.func(x, y) * np.array([x, y])
     
     def construct(self):
-        self.surface.set_opacity(0.1)
-        plane = always_redraw(self.create_tangent_plane)
-        self.add(plane)
-        self.travel_tracker(self.x, [0.5, -1, 1, 0.3])
-        self.travel_tracker(self.y, [1, -2])
+        self.surface.set_opacity(0.5)
+        # y = ValueTracker()
+        # self.x_partial = always_redraw(lambda: self.get_x_partial(y.get_value()))
+        # self.add(self.x_partial)
+        # self.travel_tracker(y, [-2, 2, -1])
+        self.get_x_partial(0.8)
+
+        # plane = always_redraw(self.create_tangent_plane)
+        # self.add(plane)
+        # self.travel_tracker(self.x, [0.5, -1, 1, 0.3])
+        # self.travel_tracker(self.y, [1, -2])
