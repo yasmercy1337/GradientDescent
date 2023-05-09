@@ -97,8 +97,9 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
             v_range=[y - alpha/ 2, y + alpha / 2]
         )
     
-    def get_x_partial(self, y: float):
+    def get_x_partial(self):
         phi, theta = self.camera.get_phi(), self.camera.get_theta()
+        y = self.y.get_value()
         # XZ plane at y
         x_min, x_max, *_ = self.ax.x_range
         z_min, z_max, *_ = self.ax.z_range
@@ -124,20 +125,18 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         self.move_camera(phi=90 * DEGREES, theta=90 * DEGREES * (-1) ** (y < 0))
 
         # create derivative
-        x = ValueTracker(x_min)
-        derivative = always_redraw(lambda: self.ax.get_secant_slope_group(x.get_value(), twoD, dx=0.001))
+        derivative = self.ax.get_secant_slope_group(self.x.get_value(), twoD, dx=0.001)
         self.play(FadeIn(derivative))
-        # moving derivative around
-        self.travel_tracker(x, [x_max / 2, x_min / 3], runtime=3)
+        self.wait() 
         
         # clearing / reverting
         self.play(FadeOut(derivative), Uncreate(twoD), Uncreate(yz_plane))
         self.remove(twoD, yz_plane, derivative)
         self.move_camera(phi=phi, theta=theta)
 
-    def get_y_partial(self, x: float):
+    def get_y_partial(self):
         phi, theta = self.camera.get_phi(), self.camera.get_theta()
-        
+        x = self.x.get_value()
         # YZ plane at x
         y_min, y_max, *_ = self.ax.y_range
         z_min, z_max, *_ = self.ax.z_range
@@ -163,12 +162,9 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         self.move_camera(phi=90 * DEGREES, theta=180 * DEGREES * (x < 0))
 
         # create derivative
-        y = ValueTracker(y_min)
-        derivative = always_redraw(lambda: self.ax.get_secant_slope_group(y.get_value(), twoD, dx=0.001))
+        derivative = self.ax.get_secant_slope_group(self.y.get_value(), twoD, dx=0.001)
         self.play(FadeIn(derivative))
-        # moving derivative around
-        self.travel_tracker(y, [y_max / 2, y_min / 3], runtime=3)
-        
+        self.wait()
         # clearing / reverting
         self.play(FadeOut(derivative), Uncreate(yz_plane), Uncreate(twoD))
         self.remove(yz_plane, twoD, derivative)
@@ -413,7 +409,7 @@ class GaussianDemo(GradientWalkthrough3D):
     
     def __init__(self) -> None:
         super().__init__(func_equation = f"f(x, y) = e^-(x^2 + y^2)", x_range=[-2, 2], y_range=[-2, 2], z_range=[-0.25, 2],
-                         x_default=0, y_default=1)
+                         x_default=0.8, y_default=1.5)
     
     def func(self, x: Input, y: Input) -> Output:
         """ The function defintion for a given 2D graph """
@@ -429,8 +425,8 @@ class GaussianDemo(GradientWalkthrough3D):
         # self.x_partial = always_redraw(lambda: self.get_x_partial(y.get_value()))
         # self.add(self.x_partial)
         # self.travel_tracker(y, [-2, 2, -1])
-        self.get_x_partial(0.8)
-        self.get_y_partial(1.5)
+        self.get_x_partial()
+        self.get_y_partial()
 
         # plane = always_redraw(self.create_tangent_plane)
         # self.add(plane)
