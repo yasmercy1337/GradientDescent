@@ -68,7 +68,7 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         self.add(self.point)
         
         # camera
-        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES,)
+        self.set_camera_orientation(phi=45 * DEGREES, theta=225 * DEGREES,)
         # self.begin_ambient_camera_rotation(rate=PI/6)
 
         # self.add_fixed_orientation_mobjects(self.surface_label, self.value_labels)
@@ -173,7 +173,7 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         self.move_camera(phi=phi, theta=theta)
     
     def create_triangle_dx(self) -> VGroup:
-        """ Returns the three lines that form tangent triangle (hor, vert, hypot) """
+        """ Returns the three lines that form tangent triangle (vert, hor, hypot) """
         x, y, a = self.x.get_value(), self.y.get_value(), self.alpha.get_value()
         tangent = self.tangent_function_dx(x, y)
         opp_signs = self.gradient(x, y)[0] * self.gradient_2(x, y)[0] < 0
@@ -187,7 +187,7 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
             Line(self.c2p(x1, y, z1), self.c2p(x2, y, z2)),
             Line(self.c2p(x0, y, z0), self.c2p(x1, y, z1)),
         )
-        if opp_signs:
+        if not opp_signs:
             return VGroup(lines[1], lines[0], lines[2])
         return VGroup(*lines)
     
@@ -306,19 +306,27 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         dz_dx, dz_dy = self.gradient(x0, y0)
         x1, y1 = x0 - dz_dx * alpha, y0 - dz_dy * alpha
         z0, z1 = self.func(x0, y0), self.func(x1, y1)
-
+        
         # create triangles
-        triangleX = always_redraw(self.create_triangle_dx)
-        triangleY = always_redraw(self.create_triangle_dy)
-        self.play(Create(triangleX), Create(triangleY))
-        # move triangleY to vertex of triangleX
-        # TODO
+        # TODO: color triangles differently
+        vert1, *sides1 = self.create_triangle_dx()
+        vert2, *sides2 = self.create_triangle_dy()
+        sides1, sides2 = VGroup(*sides1), VGroup(*sides2)
+        self.play(Create(vert1), Create(vert2), Create(sides1), Create(sides2))
+        # TODO: add alpha labels
+        # remove unuseful slides
+        self.play(Uncreate(sides1), Uncreate(sides2))
+        # move and rotate vertical lines
+        line1 = Line(self.c2p(x0, y0, z0), self.c2p(x1, y0, z0))
+        line2 = Line(line1.get_end(), self.c2p(x1, y1, z0))
+        self.play(Transform(vert2, line2), Transform(vert1, line1))
         # move create line vertically to surface
-        line = Line(self.c2p(x0, y0, z0), self.c2p(x1, y1, z1))
-        self.play(Create(line))
+        vert3 = Line(self.c2p(x1, y1, z0), self.c2p(x1, y1, z1))
+        self.play(Create(vert3))
         # move new point
         self.play(self.x.animate.set_value(x1), self.y.animate.set_value(y1))
-
+        # remove all
+        self.play(Uncreate(vert1), Uncreate(vert2), Uncreate(vert3))
 
     @abstractmethod
     def func(self, x: Input, y: Input) -> Output:
@@ -562,12 +570,12 @@ class QuarticDemo(GradientWalkthrough2D):
 class GaussianDemo(GradientWalkthrough3D):
     
     def __init__(self) -> None:
-        super().__init__(func_equation = f"f(x, y) = e^-(x^2 + y^2)", x_range=[-2, 2], y_range=[-2, 2], z_range=[-0.25, 2],
-                         x_default=0.5, y_default=0.5)
+        super().__init__(func_equation = f"f(x, y) = -e^-(x^2 + y^2)", x_range=[-2, 2], y_range=[-2, 2], z_range=[-1.75, 0.25],
+                         x_default=1, y_default=1.2, alpha_default=0.6)
     
     def func(self, x: Input, y: Input) -> Output:
         """ The function defintion for a given 2D graph """
-        return np.exp(- x ** 2 - y ** 2)
+        return -np.exp(- x ** 2 - y ** 2)
     
     def gradient(self, x: Input, y: Input) -> np.ndarray:
         """ Derivative for the function """
@@ -579,7 +587,8 @@ class GaussianDemo(GradientWalkthrough3D):
         return -2 * f * np.array([1 - 2 * x ** 2, 1 - 2 * y ** 2])
     
     def construct(self):
-        self.surface.set_opacity(0.5)
+        self.surface.set_opacity(0.3)
+        # self.set_camera_orientation(phi=60 * DEGREES, theta=225 * DEGREES,)
         # y = ValueTracker()
         # self.x_partial = always_redraw(lambda: self.get_x_partial(y.get_value()))
         # self.add(self.x_partial)
@@ -588,12 +597,13 @@ class GaussianDemo(GradientWalkthrough3D):
         # self.add(self.create_tangent_plane())
         # self.add(self.get_x_partial())
         # self.add(self.get_y_partial())
-        # self.show_gradient_normal(
-        #     self.x, 
-        #     0,
-        #     camera_thetas=(-90 * DEGREES, 90 * DEGREES),
-        # )
-        self.iterate_gradient_descent()
+        self.show_gradient_normal(
+            self.x, 
+            0,
+            camera_thetas=(-90 * DEGREES, 90 * DEGREES),
+        )
+        # for _ in range(5):
+        #     self.iterate_gradient_descent()
 
 
         # plane = always_redraw(self.create_tangent_plane)
