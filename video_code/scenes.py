@@ -109,11 +109,11 @@ class GaussianDemo(GradientWalkthrough3D):
 
         self.wait()
 
-class LinearRegressionDemo(ThreeDScene):
+class LinearRegressionDemo(GradientWalkthrough3D):
     def __init__(self):
         self.n = 100
         self.X, self.Y = self.create_dataset(n=self.n)
-        super().__init__()
+        super().__init__(x_range=[-4,4], y_range=[-10, 10], z_range=[-3,3])
 
     def create_dataset(self, n: int = 50, domain: float = 100, 
                        slope: float = 1, 
@@ -129,9 +129,8 @@ class LinearRegressionDemo(ThreeDScene):
         return m * self.X + b
 
     def func(self, u, v):
-        # y_pred = self.linear_func(m, b)
-        # return np.average((y_pred - self.Y) ** 2)
-        return np.array([np.cos(u) * np.cos(v), np.cos(u) * np.sin(v), u])
+        y_pred = self.linear_func(u, v)
+        return np.average((y_pred - self.Y) ** 2) / 1000
     
     def gradient(self, m, b):
         y_pred = self.linear_func(m, b)
@@ -149,53 +148,4 @@ class LinearRegressionDemo(ThreeDScene):
         ])
 
     def construct(self):
-        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
-        self.axes = ThreeDAxes(
-            x_range=(-6, 6, 1),
-            y_range=(-6, 6, 1),
-            z_range=(-6, 6, 1)
-        )
-        self.add(self.axes)
-
-        self.surface = Surface(
-            u_range=self.axes.x_range,
-            v_range=self.axes.y_range,
-            func=lambda m, b: self.axes.c2p(m, b, self.func(m, b))
-        )
-        self.add(self.surface)
-
-
-class ParaSurface(ThreeDScene):
-    def __init__(self):
-        self.n = 100
-        self.X, self.Y = self.create_dataset(n=self.n)
-        super().__init__()
-
-    def create_dataset(self, n: int = 50, domain: float = 100, 
-                       slope: float = 1, 
-                       y_int: float = 5,
-                       dev: float = 3) -> tuple[np.ndarray, np.ndarray]:
-        """ Returns the X and Y """
-        x = (np.random.rand(n) - 0.5) * domain
-        r = np.random.normal(0, 1, n) * dev
-        y = x * slope - r * dev + y_int
-        return x, y
-    
-    def linear_func(self, m, b):
-        return m * self.X + b
-    
-    def func(self, u, v):
-        # return np.array([np.cos(u) * np.cos(v), np.cos(u) * np.sin(v), u])
-        y_pred = self.linear_func(u, v)
-        return np.average((y_pred - self.Y) ** 2) / 1000
-
-    def construct(self):
-        axes = ThreeDAxes(x_range=[-4,4], y_range=[-10, 10], z_range=[-3,3], x_length=8)
-        surface = Surface(
-            lambda u, v: axes.c2p(u, v, self.func(u, v)),
-            u_range=[-PI, PI],
-            v_range=[0, TAU],
-            resolution=8,
-        )
-        self.set_camera_orientation(theta=70 * DEGREES, phi=75 * DEGREES)
-        self.add(axes, surface)
+        self.set_camera_orientation(theta=75 * DEGREES, phi=60 * DEGREES)
