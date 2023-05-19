@@ -69,23 +69,8 @@ class GaussianDemo(GradientWalkthrough3D):
     
     def construct(self):
         self.surface.set_opacity(0.3)
-        # self.set_camera_orientation(phi=60 * DEGREES, theta=225 * DEGREES,)
-        # y = ValueTracker()
-        # self.x_partial = always_redraw(lambda: self.get_x_partial(y.get_value()))
-        # self.add(self.x_partial)
-        # self.travel_tracker(y, [-2, 2, -1])
-
-        # self.add(self.create_tangent_plane())
-        # self.add(self.get_x_partial())
-        # self.add(self.get_y_partial())
-        # self.show_gradient_normal(
-        #     self.x, 
-        #     0,
-        #     camera_thetas=(-90 * DEGREES, 90 * DEGREES),
-        # )
-        for _ in range(5):
+        for _ in range(3):
             self.iterate_gradient_descent()
-
 
         # plane = always_redraw(self.create_tangent_plane)
         # self.add(plane)
@@ -104,7 +89,7 @@ class LinearRegressionDemo(GradientWalkthrough3D):
         self.n = 50
         self.X, self.Y = create_dataset(n=self.n, domain=100, slope=0.7, y_int=0)
         super().__init__(x_range=[0, 1.8], y_range=[-30, 30, 15], z_range=[0, 8, 2],
-                         x_default=1.5, y_default=-25, alpha_default=0.5)
+                         x_default=1.3, y_default=15, alpha_default=0.5)
         self.set_camera_orientation(theta=4 * DEGREES, phi=80 * DEGREES)
 
     def linear_func(self, m, b):
@@ -128,75 +113,12 @@ class LinearRegressionDemo(GradientWalkthrough3D):
             m * np.sum(self.X ** 2),
             self.n,
         ])
-
-    def iterate_gradient_descent(self):
-        # variables
-        x, y, a = self.x.get_value(), self.y.get_value(), self.alpha.get_value()
-        z = self.func(x, y)
-        gradient = self.gradient(x, y)
-        dx, dy = gradient * a / np.sqrt(np.sum(gradient ** 2))
-        x1, y1 = x - dx, y - dy
-        z1 = self.func(x1, y1)
-        
-        # get the 2D functions where x and y are fixed respectively
-        y_slice_f = lambda t: [t, y, self.func(t, y)]
-        x_slice_f = lambda t: [x, t, self.func(x, t)]
-        y_tangent_f = self.tangent_function_dx(x, y)
-        x_tangent_f = self.tangent_function_dy(x, y)
-        
-        y_slice = self.ax.plot_parametric_curve(y_slice_f, t_range=self.ax.x_range)
-        x_slice = self.ax.plot_parametric_curve(x_slice_f, t_range=self.ax.y_range)
-        y_tangent_range = np.array([self.ax.z_range[0] - z, self.ax.z_range[1] - z]) / dx + x
-        x_tangent_range = np.array([self.ax.z_range[0] - z, self.ax.z_range[1] - z]) / dy + y
-        y_tangent = self.ax.plot_parametric_curve(y_tangent_f, t_range=[min(y_tangent_range), max(y_tangent_range)])
-        x_tangent = self.ax.plot_parametric_curve(x_tangent_f, t_range=[min(x_tangent_range), max(x_tangent_range)])
-        
-        # creating tangent and slices
-        self.play(Create(y_slice), Create(x_slice))
-        self.play(Create(x_tangent), Create(y_tangent))
-        
-        # remove slices
-        self.play(FadeOut(x_slice), FadeOut(y_slice))
-        
-        # convert tangent lines to vectors of length alpha (that are pointing down)
-        dir_dx = np.array([-dx, 0, -dx ** 2])
-        dir_dy = np.array([0, -dy, -dy ** 2])
-        p0, p1, p2, p3 = [x, y, z], [x, y, z] + dir_dx, [x, y, z] + dir_dy, [x, y, z] + dir_dx + dir_dy
-        print("testing")
-        assert np.sum(p3[:2] - [x1, y1]) < 0.05
-        
-        vdx = Arrow(start=self.c2p(*p0), end=self.c2p(*p1))
-        vdy = Arrow(start=self.c2p(*p0), end=self.c2p(*p2))
-        self.play(ReplacementTransform(y_tangent, vdx), ReplacementTransform(x_tangent, vdy))
-        
-        # add vectors
-        v3 = Arrow(start=self.c2p(*p2), end=self.c2p(*p3))
-        self.play(ReplacementTransform(vdx, v3))
-
-        # add line going to function
-        line = Arrow(start=self.c2p(*p3), end=self.c2p(x1, y1, z1))
-        self.play(GrowFromPoint(line, self.c2p(x1, y1, z1)))
-        
-        self.play(self.x.animate.set_value(x1), self.y.animate.set_value(y1)) # move
-        self.remove(vdx, vdy, v3, line) # clear
         
     def construct(self):
         self.surface.set_opacity(0.5)
-
         for _ in range(3):
             self.iterate_gradient_descent()
-            print(self.x.get_value(), self.y.get_value())
         self.wait(1)
-
-    def iterate(self):
-        x, y, a = self.x.get_value(), self.y.get_value(), self.alpha.get_value()
-        n = 2
-        for i in range(n):
-            # if i % (n // 10) == 0:
-            print(f"iteration {i}", x, y, self.func(x, y))
-                
-            dx, dy = self.gradient(x, y) * a
-            x, y = x - dx, y - dy
    
 class FirstDerivativeTest(Scene):
     
@@ -286,7 +208,15 @@ class LeastSquaresCost(ThreeDScene):
         y_pred = m * x + b
         return self.residuals(y_pred, y_real)
     
-    def construct(self):
+    def gradient(self, m, b, x, y_real):
+        residuals = m * x + b - y_real
+        
+        return 2 / 10_000 * np.array([
+            np.dot(residuals, x),
+            np.sum(residuals)
+        ])
+        
+    def construct1(self):
         m = ValueTracker(0.7)
         b = ValueTracker(0)
         x, y_real = create_dataset(domain=100, slope=0.7, y_int=0)
@@ -356,6 +286,74 @@ class LeastSquaresCost(ThreeDScene):
         
         self.wait(2)
 
+    def construct2(self):
+        m = ValueTracker(2)
+        b = ValueTracker(-30)
+        x, y_real = create_dataset(domain=100, slope=0.7, y_int=0)
+        
+        # 2D graph
+        x_range=[-90, 90, 30]
+        y_range=[-60, 60, 30] 
+        axes = Axes(x_range=x_range, y_range=y_range, axis_config={"include_numbers": True}, x_length=6, y_length=4).to_edge(RIGHT)
+        points = VGroup(*(Dot(axes.c2p(*p)) for p in zip(x, y_real)))
+        best_fit = always_redraw(lambda: axes.plot(self.linear(m.get_value(), b.get_value()), x_range=x_range))
+        squares = always_redraw(lambda: self.create_all_squares(x, m.get_value() * x + b.get_value(), y_real, axes))
+        rss_label = always_redraw(lambda: Tex(f"Residual Squared Sum: {self.cost(x, m.get_value(), b.get_value(), y_real):.2f}")
+                                  .to_edge(LEFT).to_edge(UP, buff=1))
+
+        # 3D graph
+        x_range=[-60, 60, 30] # bias
+        y_range=[0, 20, 2] # cost
+        z_range=[0, 2, 1] # slope
+        cost_scale = 0.0001 # 1 / 10_000
+        cost_axes_3D = ThreeDAxes(x_range=x_range, y_range=y_range, z_range=z_range, axis_config={"include_numbers": True}, 
+                                  x_length=6, y_length=4, tips=False).to_edge(LEFT)
+        cost_graph_3D = always_redraw(lambda: VGroup(*(
+            cost_axes_3D.plot_parametric_curve(
+                lambda b: [b, self.cost(x, m, b, y_real) * cost_scale, m],
+                t_range=x_range,
+                color=BLUE)
+            for m in np.arange(0, 2, 0.1))
+        ))
+        
+        # current point
+        current_point = always_redraw(
+            lambda: Dot(cost_axes_3D.c2p(
+                b.get_value(), 
+                self.cost(x, m.get_value(), b.get_value(), y_real) * cost_scale, 
+                m.get_value()))
+            )
+        
+        # adding all
+        self.add(points, axes, cost_axes_3D, cost_graph_3D, best_fit, squares, rss_label, current_point)
+        
+        # animating gradient descent steps
+        self.wait()
+        total_runtime = 10
+        n = 30
+        for iteration, (m0, b0) in enumerate(self.get_gradient_points(n, m.get_value(), b.get_value(), x, y_real)):
+            ratio = 0.8
+            run_time = max((total_runtime * (1 - ratio)) * ratio ** iteration, 1/60)
+            self.play(
+                m.animate(run_time=run_time).set_value(m0),
+                b.animate(run_time=run_time).set_value(b0)
+            )
+        self.wait(2)
+        
+    def get_gradient_points(self, n, m0, b0, x, y_real):
+        alpha = 0.2
+        out = []
+        
+        for i in range(n):
+            gradient = self.gradient(m0, b0, x, y_real) * alpha
+            gradient[1] *= 75
+            m0, b0 = [m0, b0] - gradient
+            out.append([m0, b0])
+        return out
+    
+    def construct(self):
+        self.construct2()
+        
 def create_dataset(
     n: int = 50, 
     domain: float = 100, 
@@ -372,11 +370,5 @@ def create_dataset(
     return x, y
 
 if __name__ == "__main__":
-    x, y = create_dataset(n=50, domain=100, slope=0.7, y_int=0)
-    x = np.vstack([x, np.ones(len(x))]).T
-    m, b = np.linalg.lstsq(x, y, rcond=None)[0]
-    print("Best:", m, b, LinearRegressionDemo().func(m, b))
-    # print(LinearRegressionDemo().func(m, b))
-    # print(LinearRegressionDemo().func(0.6, 1))
-    LinearRegressionDemo().iterate()
+    print(*LeastSquaresCost().get_gradient_points(30, 2, -30, *create_dataset(domain=100, slope=0.7, y_int=0)), sep="\n")
     

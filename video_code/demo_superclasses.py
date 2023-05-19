@@ -301,30 +301,53 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         self.travel_tracker(self.x, [-1, 0, 1])
 
     def iterate_gradient_descent(self):
-        x0, y0, alpha = self.x.get_value(), self.y.get_value(), self.alpha.get_value()
-        dz_dx, dz_dy = self.gradient(x0, y0)
-        x1, y1 = x0 - dz_dx * alpha, y0 - dz_dy * alpha
-        z0, z1 = self.func(x0, y0), self.func(x1, y1)
-        # create triangles
-        # TODO: color triangles differently
-        vert1, *sides1 = self.create_triangle_dx()
-        vert2, *sides2 = self.create_triangle_dy()
-        sides1, sides2 = VGroup(*sides1), VGroup(*sides2)
-        self.play(Create(vert1), Create(vert2), Create(sides1), Create(sides2))
-        # TODO: add alpha labels
-        # remove unuseful sides
-        self.play(Uncreate(sides1), Uncreate(sides2))
-        # move and rotate vertical lines
-        line1 = Line(self.c2p(x0, y0, z0), self.c2p(x1, y0, z0))
-        line2 = Line(line1.get_end(), self.c2p(x1, y1, z0))
-        self.play(Transform(vert2, line2), Transform(vert1, line1))
-        # move create line vertically to surface
-        vert3 = Line(self.c2p(x1, y1, z0), self.c2p(x1, y1, z1))
-        self.play(Create(vert3))
-        # move new point
-        self.play(self.x.animate.set_value(x1), self.y.animate.set_value(y1))
-        # remove all
-        self.play(Uncreate(vert1), Uncreate(vert2), Uncreate(vert3))
+        # variables
+        x, y, a = self.x.get_value(), self.y.get_value(), self.alpha.get_value()
+        z = self.func(x, y)
+        gradient = self.gradient(x, y)
+        dx, dy = gradient * a / np.sqrt(np.sum(gradient ** 2))
+        x1, y1 = x - dx, y - dy
+        z1 = self.func(x1, y1)
+        
+        # get the 2D functions where x and y are fixed respectively
+        y_slice_f = lambda t: [t, y, self.func(t, y)]
+        x_slice_f = lambda t: [x, t, self.func(x, t)]
+        y_tangent_f = self.tangent_function_dx(x, y)
+        x_tangent_f = self.tangent_function_dy(x, y)
+        
+        y_slice = self.ax.plot_parametric_curve(y_slice_f, t_range=self.ax.x_range)
+        x_slice = self.ax.plot_parametric_curve(x_slice_f, t_range=self.ax.y_range)
+        y_tangent_range = np.array([self.ax.z_range[0] - z, self.ax.z_range[1] - z]) / dx + x
+        x_tangent_range = np.array([self.ax.z_range[0] - z, self.ax.z_range[1] - z]) / dy + y
+        y_tangent = self.ax.plot_parametric_curve(y_tangent_f, t_range=[min(y_tangent_range), max(y_tangent_range)])
+        x_tangent = self.ax.plot_parametric_curve(x_tangent_f, t_range=[min(x_tangent_range), max(x_tangent_range)])
+        
+        # creating tangent and slices
+        self.play(Create(y_slice), Create(x_slice))
+        self.play(Create(x_tangent), Create(y_tangent))
+        
+        # remove slices
+        self.play(FadeOut(x_slice), FadeOut(y_slice))
+        
+        # convert tangent lines to vectors of length alpha (that are pointing down)
+        dir_dx = np.array([-dx, 0, -dx ** 2])
+        dir_dy = np.array([0, -dy, -dy ** 2])
+        p0, p1, p2, p3 = [x, y, z], [x, y, z] + dir_dx, [x, y, z] + dir_dy, [x, y, z] + dir_dx + dir_dy
+        
+        vdx = Arrow(start=self.c2p(*p0), end=self.c2p(*p1))
+        vdy = Arrow(start=self.c2p(*p0), end=self.c2p(*p2))
+        self.play(ReplacementTransform(y_tangent, vdx), ReplacementTransform(x_tangent, vdy))
+        
+        # add vectors
+        v3 = Arrow(start=self.c2p(*p2), end=self.c2p(*p3))
+        self.play(ReplacementTransform(vdx, v3))
+
+        # add line going to function
+        line = Arrow(start=self.c2p(*p3), end=self.c2p(x1, y1, z1))
+        self.play(GrowFromPoint(line, self.c2p(x1, y1, z1)))
+        
+        self.play(self.x.animate.set_value(x1), self.y.animate.set_value(y1)) # move
+        self.remove(vdx, vdy, v3, line) # clear
     
     @abstractmethod
     def func(self, x: Input, y: Input) -> Output:
