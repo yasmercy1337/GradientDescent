@@ -25,7 +25,31 @@ class ParabolaDivergence(GradientWalkthrough2D):
     def construct(self):
         for _ in range(5):
             self.iterate_gradient_descent()
+
+class ParabolaGradientRelations(GradientWalkthrough2D):
+    def __init__(self) -> None:
+        super().__init__(x_range = (-2, 2, 0.5), y_range = (-1, 4, 0.5), func_equation = "f(x) = x^2", x_default=0.5, alpha_default=1.1)
         
+    def func(self, x: Input) -> Output:
+        """ The function defintion for a given 2D graph """
+        return x ** 2
+    
+    def deriv(self, x: Input) -> Output:
+        """ Derivative for the function """
+        return 2 * x
+    
+    def deriv_2(self, x: Input) -> Output:
+        """ 2nd derivative for the function """
+        return 2
+        
+    def construct(self):
+        t = VGroup(always_redraw(lambda: self.create_triangle(RED)), always_redraw(self.create_triangle_label))
+        self.add(t)
+        self.travel_tracker(self.x, [0.2, 1, 0.5])
+        self.travel_tracker(self.alpha, [1.1, 0, 1.1])
+        self.play(FadeOut(t))
+        self.iterate_gradient_descent()
+
 class QuarticLocalMinima(GradientWalkthrough2D):
     
     def __init__(self) -> None:

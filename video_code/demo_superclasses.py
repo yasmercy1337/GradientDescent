@@ -427,7 +427,7 @@ class GradientWalkthrough2D(Scene, ABC):
         self.triangle_label = always_redraw(self.create_triangle_label)
         self.add(self.triangle_label)
     
-    def create_triangle(self) -> VGroup:
+    def create_triangle(self, color_vert = BLUE) -> VGroup:
         """ Returns the three lines that form tangent triangle (hor, vert, hypot) """
         x, a = self.x.get_value(), self.alpha.get_value()
         tangent = self.tangent_function()
@@ -439,7 +439,7 @@ class GradientWalkthrough2D(Scene, ABC):
         
         lines = (
             Line(self.c2p(x0, y0), self.c2p(x2, y2)),
-            Line(self.c2p(x1, y1), self.c2p(x2, y2)),
+            Line(self.c2p(x1, y1), self.c2p(x2, y2), color=color_vert),
             Line(self.c2p(x0, y0), self.c2p(x1, y1)),
         )
         if opp_signs:
