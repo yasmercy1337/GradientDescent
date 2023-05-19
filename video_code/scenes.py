@@ -101,35 +101,103 @@ class GaussianDemo(GradientWalkthrough3D):
 
 class LinearRegressionDemo(GradientWalkthrough3D):
     def __init__(self):
-        self.n = 100
-        self.X, self.Y = create_dataset(n=self.n)
-        super().__init__(x_range=[-4,4], y_range=[-60, 60, 30], z_range=[-3,3])
+        self.n = 50
+        self.X, self.Y = create_dataset(n=self.n, domain=100, slope=0.7, y_int=0)
+        super().__init__(x_range=[0, 1.8], y_range=[-30, 30, 15], z_range=[0, 8, 2],
+                         x_default=1.5, y_default=-25, alpha_default=0.5)
+        self.set_camera_orientation(theta=4 * DEGREES, phi=80 * DEGREES)
 
     def linear_func(self, m, b):
         return m * self.X + b
 
     def func(self, u, v):
         y_pred = self.linear_func(u, v)
-        return np.average((y_pred - self.Y) ** 2) / 1000
+        return np.sum((y_pred - self.Y) ** 2) / 10_000
     
     def gradient(self, m, b):
         y_pred = self.linear_func(m, b)
         diff = y_pred - self.Y
-
-        return 2 / self.n * np.array([
+        
+        return 2 / 10_000 * np.array([
             np.dot(diff, self.X),
-            diff
+            np.sum(diff)
         ])
 
     def gradient_2(self, m, b):
-        return 2 / self.n * np.array([
-            np.sum(self.X ** 2),
-            np.sum(self.X)
+        return 2 / 10_000 * np.array([
+            m * np.sum(self.X ** 2),
+            self.n,
         ])
 
-    def construct(self):
-        self.set_camera_orientation(theta=75 * DEGREES, phi=60 * DEGREES)
+    def iterate_gradient_descent(self):
+        # variables
+        x, y, a = self.x.get_value(), self.y.get_value(), self.alpha.get_value()
+        z = self.func(x, y)
+        gradient = self.gradient(x, y)
+        dx, dy = gradient * a / np.sqrt(np.sum(gradient ** 2))
+        x1, y1 = x - dx, y - dy
+        z1 = self.func(x1, y1)
+        
+        # get the 2D functions where x and y are fixed respectively
+        y_slice_f = lambda t: [t, y, self.func(t, y)]
+        x_slice_f = lambda t: [x, t, self.func(x, t)]
+        y_tangent_f = self.tangent_function_dx(x, y)
+        x_tangent_f = self.tangent_function_dy(x, y)
+        
+        y_slice = self.ax.plot_parametric_curve(y_slice_f, t_range=self.ax.x_range)
+        x_slice = self.ax.plot_parametric_curve(x_slice_f, t_range=self.ax.y_range)
+        y_tangent_range = np.array([self.ax.z_range[0] - z, self.ax.z_range[1] - z]) / dx + x
+        x_tangent_range = np.array([self.ax.z_range[0] - z, self.ax.z_range[1] - z]) / dy + y
+        y_tangent = self.ax.plot_parametric_curve(y_tangent_f, t_range=[min(y_tangent_range), max(y_tangent_range)])
+        x_tangent = self.ax.plot_parametric_curve(x_tangent_f, t_range=[min(x_tangent_range), max(x_tangent_range)])
+        
+        # creating tangent and slices
+        self.play(Create(y_slice), Create(x_slice))
+        self.play(Create(x_tangent), Create(y_tangent))
+        
+        # remove slices
+        self.play(FadeOut(x_slice), FadeOut(y_slice))
+        
+        # convert tangent lines to vectors of length alpha (that are pointing down)
+        dir_dx = np.array([-dx, 0, -dx ** 2])
+        dir_dy = np.array([0, -dy, -dy ** 2])
+        p0, p1, p2, p3 = [x, y, z], [x, y, z] + dir_dx, [x, y, z] + dir_dy, [x, y, z] + dir_dx + dir_dy
+        print("testing")
+        assert np.sum(p3[:2] - [x1, y1]) < 0.05
+        
+        vdx = Arrow(start=self.c2p(*p0), end=self.c2p(*p1))
+        vdy = Arrow(start=self.c2p(*p0), end=self.c2p(*p2))
+        self.play(ReplacementTransform(y_tangent, vdx), ReplacementTransform(x_tangent, vdy))
+        
+        # add vectors
+        v3 = Arrow(start=self.c2p(*p2), end=self.c2p(*p3))
+        self.play(ReplacementTransform(vdx, v3))
 
+        # add line going to function
+        line = Arrow(start=self.c2p(*p3), end=self.c2p(x1, y1, z1))
+        self.play(GrowFromPoint(line, self.c2p(x1, y1, z1)))
+        
+        self.play(self.x.animate.set_value(x1), self.y.animate.set_value(y1)) # move
+        self.remove(vdx, vdy, v3, line) # clear
+        
+    def construct(self):
+        self.surface.set_opacity(0.5)
+
+        for _ in range(3):
+            self.iterate_gradient_descent()
+            print(self.x.get_value(), self.y.get_value())
+        self.wait(1)
+
+    def iterate(self):
+        x, y, a = self.x.get_value(), self.y.get_value(), self.alpha.get_value()
+        n = 2
+        for i in range(n):
+            # if i % (n // 10) == 0:
+            print(f"iteration {i}", x, y, self.func(x, y))
+                
+            dx, dy = self.gradient(x, y) * a
+            x, y = x - dx, y - dy
+   
 class FirstDerivativeTest(Scene):
     
     def r(self, t: float) -> float:
@@ -302,3 +370,13 @@ def create_dataset(
     r = np.random.normal(0, 1, n) * dev
     y = x * slope - r * dev + y_int
     return x, y
+
+if __name__ == "__main__":
+    x, y = create_dataset(n=50, domain=100, slope=0.7, y_int=0)
+    x = np.vstack([x, np.ones(len(x))]).T
+    m, b = np.linalg.lstsq(x, y, rcond=None)[0]
+    print("Best:", m, b, LinearRegressionDemo().func(m, b))
+    # print(LinearRegressionDemo().func(m, b))
+    # print(LinearRegressionDemo().func(0.6, 1))
+    LinearRegressionDemo().iterate()
+    

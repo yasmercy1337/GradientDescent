@@ -31,10 +31,10 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
             x_range=x_range,
             y_range=y_range,
             z_range=z_range,
-            axis_config={"include_numbers": True},
-            x_length=8,
-            y_length=6,
-            z_length=6
+            # axis_config={"include_numbers": True},
+            x_length=15,
+            y_length=8,
+            z_length=3,
         )
         self.ax_labels = self.ax.get_axis_labels()
         
@@ -305,7 +305,6 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         dz_dx, dz_dy = self.gradient(x0, y0)
         x1, y1 = x0 - dz_dx * alpha, y0 - dz_dy * alpha
         z0, z1 = self.func(x0, y0), self.func(x1, y1)
-        
         # create triangles
         # TODO: color triangles differently
         vert1, *sides1 = self.create_triangle_dx()
@@ -313,7 +312,7 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         sides1, sides2 = VGroup(*sides1), VGroup(*sides2)
         self.play(Create(vert1), Create(vert2), Create(sides1), Create(sides2))
         # TODO: add alpha labels
-        # remove unuseful slides
+        # remove unuseful sides
         self.play(Uncreate(sides1), Uncreate(sides2))
         # move and rotate vertical lines
         line1 = Line(self.c2p(x0, y0, z0), self.c2p(x1, y0, z0))
@@ -326,7 +325,7 @@ class GradientWalkthrough3D(ThreeDScene, ABC):
         self.play(self.x.animate.set_value(x1), self.y.animate.set_value(y1))
         # remove all
         self.play(Uncreate(vert1), Uncreate(vert2), Uncreate(vert3))
-
+    
     @abstractmethod
     def func(self, x: Input, y: Input) -> Output:
         """ The function defintion for a given 2D graph """
